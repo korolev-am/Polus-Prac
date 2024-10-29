@@ -206,7 +206,7 @@ void calc_coefs(double h1, double h2, double EPS){
     double xi, yj, lij, gij, tmp;
     int i, j;
     // Вычисление коэффициентов a, b и правой части F
-    #pragma omp parallel for collapse(2) private(i, j, xi, yj, lij, gij) shared(EPS, h1, h2)
+    #pragma omp parallel for collapse(2) private(i, j, xi, yj, lij, gij) // shared(EPS, h1, h2)
     for (i = 1; i < M-1; i++) {
         for (j = 1; j < N-1; j++) {
             xi = A1 + i*h1;
@@ -234,7 +234,7 @@ int MRD(double h1, double h2){
         norm_dr = 0.0;
         norm = 0.0;
 
-        #pragma omp parallel for collapse(2) reduction(+:norm_r) private(i, j) shared(a, b, F, r, w, h1, h2)
+        #pragma omp parallel for collapse(2) reduction(+:norm_r) private(i, j) shared(a, b, F, r, w)
         for (i = 1; i < M-1; i++) {
             for (j = 1; j < N-1; j++) {
                 // тут вычисляем невязку
@@ -245,7 +245,7 @@ int MRD(double h1, double h2){
             }
         }
 
-        #pragma omp parallel for collapse(2) reduction(+:norm_dr) private(i, j) shared(a, b, r, Ar, h1, h2)
+        #pragma omp parallel for collapse(2) reduction(+:norm_dr) private(i, j) shared(a, b, r, Ar)
         for (i = 1; i < M-1; i++) {
             for (j = 1; j < N-1; j++) {
                 // тут - матрицу A*r
@@ -258,7 +258,7 @@ int MRD(double h1, double h2){
         tau = norm_r / norm_dr;
 
         // тут немного неэффективно считаем норму для проверки условия останова + уравнение (15)
-        #pragma omp parallel for reduction(+:norm) private(i, j, tmp) shared(w, r, tau, h1, h2)
+        #pragma omp parallel for reduction(+:norm) private(i, j, tmp) shared(w, r)
         for (i = 1; i < M; i++) {
             for (j = 1; j < N; j++) {
                 tmp = w[i][j];
@@ -320,8 +320,6 @@ int main(int argc, char *argv[]){
             make_experiment(num_threads);
         }
     }
-
-    // make_experiment(4);
 
     return 0;
 }
