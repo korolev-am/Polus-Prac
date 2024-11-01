@@ -2,8 +2,8 @@
 #include <math.h>
 #include <omp.h>
 
-#define M 40
-#define N 40
+#define M 160
+#define N 180
 
 // это задаем область П - прямоугольник, содержащий нашу трапецию
 #define A1 -3.0
@@ -13,7 +13,7 @@
 
 
 // #define EPS 1e-3 // TODO сделать = h^2
-#define ACC 1e-6 // это точность метода
+#define ACC 8*1e-7 // это точность метода
 
 
 typedef struct {
@@ -273,17 +273,17 @@ int main() {
             err_by_iter[err_cnt++] = norm;
         }
 
-        if(!(iter % step_2)) {
-            for (i = 0; i < M; i++) {
-                for (j = 0; j < N; j++) {
-                    printf("%f ", r[i][j]);
-                }
-                printf("\n");
-            }
-            printf("==========================================================================================================\n");
-        }
+        // if(!(iter % step_2)) {
+        //     for (i = 0; i < M; i++) {
+        //         for (j = 0; j < N; j++) {
+        //             printf("%f ", r[i][j]);
+        //         }
+        //         printf("\n");
+        //     }
+        //     printf("==========================================================================================================\n");
+        // }
 
-        // printf("Тау: %lf, norm_r: %lf, norm_dr%lf, norm: %lf\n", tau, norm_r, norm_dr, norm);
+        printf("Тау: %lf, norm_r: %lf, norm_dr%lf, norm: %lf\n", tau, norm_r, norm_dr, norm);
         iter++;
     } while (norm > ACC);
 

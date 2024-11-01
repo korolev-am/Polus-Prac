@@ -6,7 +6,10 @@ def read_matrix_from_file(file_path):
     with open(file_path, 'r') as file:
         # Читаем файл и преобразуем в список списков
         matrix = [list(map(float, line.split())) for line in file]
-    return matrix
+
+    new_matrix = [[matrix[j][i] for j in range(len(matrix))] for i in range(len(matrix[0])-1,-1,-1)]
+
+    return new_matrix
 
 def plot_heatmap(matrix):
     # Преобразуем в DataFrame для удобства работы с Seaborn
@@ -14,8 +17,8 @@ def plot_heatmap(matrix):
     
     # Создаем тепловую карту
     plt.figure(figsize=(8, 6))
-    sns.heatmap(df, annot=True, cmap='viridis')
-    plt.title('График ошибок по области')
+    sns.heatmap(df, annot=False, cmap='viridis')
+    plt.title('Тепловая карта решения')
     plt.show()
 
 if __name__ == "__main__":

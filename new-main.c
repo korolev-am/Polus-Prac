@@ -8,8 +8,8 @@
 #define B1 3.0
 #define B2 3.0
 
-#define M 40
-#define N 40
+#define M 10
+#define N 10
 
 #define ACC 1e-6 // это точность метода
 
@@ -172,9 +172,6 @@ double f(double x_l, double y_l, double x_r, double y_r, double h1, double h2) {
 
 }
 
-// int M = 40;
-// int N = 40;
-
 double w[M][N];
 double r[M][N];
 double a[M][N], b[M][N];
@@ -188,7 +185,7 @@ void initialize(){
     int i = 0;
     int j = 0;
 
-    #pragma omp parallel for collapse(2) private(i, j) // shared(M, N)
+    #pragma omp parallel for collapse(2) private(i, j)
     for (i = 0; i < M; i++) {
         for (j = 0; j < N; j++) {
             w[i][j] = 0.0;
@@ -206,9 +203,9 @@ void calc_coefs(double h1, double h2, double EPS){
     double xi, yj, lij, gij, tmp;
     int i, j;
     // Вычисление коэффициентов a, b и правой части F
-    #pragma omp parallel for collapse(2) private(i, j, xi, yj, lij, gij) // shared(EPS, h1, h2)
-    for (i = 1; i < M-1; i++) {
-        for (j = 1; j < N-1; j++) {
+    #pragma omp parallel for collapse(2) private(i, j, xi, yj, lij, gij)
+    for (i = 1; i < M; i++) {
+        for (j = 1; j < N; j++) {
             xi = A1 + i*h1;
             yj = A2 + j*h2;
 
@@ -218,7 +215,9 @@ void calc_coefs(double h1, double h2, double EPS){
             a[i][j] = lij / h2 + (1.0 - lij / h2) / EPS;
             b[i][j] = gij / h1 + (1.0 - gij / h1) / EPS;
 
-            F[i][j] = f(xi-0.5*h1, yj-0.5*h2, xi+0.5*h1, yj+0.5*h2, h1, h2);
+            if(i != M-1 && j != N-1) {
+                F[i][j] = f(xi-0.5*h1, yj-0.5*h2, xi+0.5*h1, yj+0.5*h2, h1, h2);
+            }
         }
     }
 }
@@ -257,7 +256,6 @@ int MRD(double h1, double h2){
 
         tau = norm_r / norm_dr;
 
-        // тут немного неэффективно считаем норму для проверки условия останова + уравнение (15)
         #pragma omp parallel for reduction(+:norm) private(i, j, tmp) shared(w, r)
         for (i = 1; i < M; i++) {
             for (j = 1; j < N; j++) {
@@ -267,6 +265,8 @@ int MRD(double h1, double h2){
                 norm += tmp * tmp * h1 * h2;
             }
         }
+
+
 
         norm = sqrt(norm);
         // printf("Tau: %f, norm_r: %f, norm_dr: %f, norm: %f\n", tau, norm_r, norm_dr, norm);
@@ -302,9 +302,10 @@ void make_experiment(int num_treads) {
     printf("Iterations number: %d\n", iterations);
 
     // Вывод решения
+    // int i, j;
     // for (i = 0; i < M; i++) {
     //     for (j = 0; j < N; j++) {
-    //         printf("%f ", w[i][j]);
+    //         printf("%f ", r[i][j]);
     //     }
     //     printf("\n");
     // }
