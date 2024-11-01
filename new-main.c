@@ -1,9 +1,6 @@
 #include <stdio.h>
-#include <math.h>
 #include <omp.h>
-
-#define M 160
-#define N 180
+#include <math.h>
 
 // это задаем область П - прямоугольник, содержащий нашу трапецию
 #define A1 -3.0
@@ -11,9 +8,10 @@
 #define B1 3.0
 #define B2 3.0
 
+#define M 10
+#define N 10
 
-// #define EPS 1e-3 // TODO сделать = h^2
-#define ACC 8*1e-7 // это точность метода
+#define ACC 1e-6 // это точность метода
 
 
 typedef struct {
@@ -25,7 +23,7 @@ typedef struct {
 } Trapezoid;
 
 typedef struct {
-    Point F, G, H, P; // Вершины прямоугольника TODO переименовать
+    Point F, G, H, P; // Вершины прямоугольника
 } Rectangle;
 
 
@@ -122,7 +120,7 @@ double lengh_of_vert_line(Point top, Point bottom){
     if(left_line(bottom) <= 0 || right_line(bottom) <= 0) {
         return 0.0;
     } else if (left_line(bottom) > 0 && left_line(top) < 0){
-        top_point.y = 3.0 * bottom.x + 9.0;  // TODO вынести в функцию
+        top_point.y = 3.0 * bottom.x + 9.0;
         top_point.x = top.x;
         bottom_point = bottom;
     } else if (right_line(bottom) > 0 && left_line(top) < 0){
@@ -174,30 +172,20 @@ double f(double x_l, double y_l, double x_r, double y_r, double h1, double h2) {
 
 }
 
-int main() {
-    double h1 = (B1 - A1) / M;
-    double h2 = (B2 - A2) / N;
+double w[M][N];
+double r[M][N];
+double a[M][N], b[M][N];
+double F[M][N];
+double Ar[M][N];
 
-    double EPS = h1 > h2 ? h1*h1 : h2*h2;
 
-    double w[M][N];
-    double r[M][N];
-    double a[M][N], b[M][N];
-    double F[M][N];
-    double Diff[M][N];
-    double Ar[M][N];
-    int i, j, k;
-    int err_cnt = 0;
-
-    double err_by_iter[20];
-    int step = 12000;
-    int step_2 = 24000;
-
-    for (i = 0; i < 20; i++){
-        err_by_iter[i] = 0.0;
-    }
-
+void initialize(){
     // Инициализация
+
+    int i = 0;
+    int j = 0;
+
+    #pragma omp parallel for collapse(2) private(i, j)
     for (i = 0; i < M; i++) {
         for (j = 0; j < N; j++) {
             w[i][j] = 0.0;
@@ -205,106 +193,134 @@ int main() {
             a[i][j] = 0.0;
             b[i][j] = 0.0;
             F[i][j] = 0.0;
-            Diff[i][j] = 0.0;  // TODO убрать
             Ar[i][j] = 0.0;
         }
     }
+}
 
-    double start = omp_get_wtime();
 
+void calc_coefs(double h1, double h2, double EPS){
+    double xi, yj, lij, gij, tmp;
+    int i, j;
     // Вычисление коэффициентов a, b и правой части F
-    for (i = 1; i < M-1; i++) {
-        for (j = 1; j < N-1; j++) {
-            double xi = A1 + i*h1;
-            double yj = A2 + j*h2;
+    #pragma omp parallel for collapse(2) private(i, j, xi, yj, lij, gij)
+    for (i = 1; i < M; i++) {
+        for (j = 1; j < N; j++) {
+            xi = A1 + i*h1;
+            yj = A2 + j*h2;
 
-            double lij = lengh_of_vert_line((Point){xi-0.5*h1, yj+0.5*h2}, (Point){xi-0.5*h1, yj-0.5*h2});
-            double gij = lengh_of_horz_line((Point){xi-0.5*h1, yj-0.5*h2}, (Point){xi+0.5*h1, yj-0.5*h2});
+            lij = lengh_of_vert_line((Point){xi-0.5*h1, yj+0.5*h2}, (Point){xi-0.5*h1, yj-0.5*h2});
+            gij = lengh_of_horz_line((Point){xi-0.5*h1, yj-0.5*h2}, (Point){xi+0.5*h1, yj-0.5*h2});
 
             a[i][j] = lij / h2 + (1.0 - lij / h2) / EPS;
             b[i][j] = gij / h1 + (1.0 - gij / h1) / EPS;
 
-            F[i][j] = f(xi-0.5*h1, yj-0.5*h2, xi+0.5*h1, yj+0.5*h2, h1, h2);
+            if(i != M-1 && j != N-1) {
+                F[i][j] = f(xi-0.5*h1, yj-0.5*h2, xi+0.5*h1, yj+0.5*h2, h1, h2);
+            }
         }
     }
+}
 
+
+int MRD(double h1, double h2){
     // Метод скорейшего спуска
-    double tau, norm_r, norm_dr, norm;
+    double tau, norm_r, norm_dr, norm, tmp;
+    int i, j;
     int iter = 0;
     do {
         norm_r = 0.0;
         norm_dr = 0.0;
         norm = 0.0;
+
+        #pragma omp parallel for collapse(2) reduction(+:norm_r) private(i, j) shared(a, b, F, r, w)
         for (i = 1; i < M-1; i++) {
             for (j = 1; j < N-1; j++) {
                 // тут вычисляем невязку
                 r[i][j] = -(a[i+1][j] * (w[i+1][j] - w[i][j]) / h1 - a[i][j] * (w[i][j] - w[i-1][j]) / h1) / h1
                         - (b[i][j+1] * (w[i][j+1] - w[i][j]) / h2 - b[i][j] * (w[i][j] - w[i][j-1]) / h2) / h2
                         - F[i][j];
+                norm_r += r[i][j] * r[i][j] * h1 * h2;
             }
         }
 
+        #pragma omp parallel for collapse(2) reduction(+:norm_dr) private(i, j) shared(a, b, r, Ar)
         for (i = 1; i < M-1; i++) {
             for (j = 1; j < N-1; j++) {
                 // тут - матрицу A*r
                 Ar[i][j] = -(a[i+1][j] * (r[i+1][j] - r[i][j]) / h1 - a[i][j] * (r[i][j] - r[i-1][j]) / h1) / h1
                         - (b[i][j+1] * (r[i][j+1] - r[i][j]) / h2 - b[i][j] * (r[i][j] - r[i][j-1]) / h2) / h2;
-                
-                norm_r += r[i][j] * r[i][j] * h1 * h2;
                 norm_dr += Ar[i][j] * r[i][j] * h1 * h2;
             }
         }
 
         tau = norm_r / norm_dr;
 
-        // тут немного неэффективно считаем норму для проверки условия останова + уравнение (15)
+        #pragma omp parallel for reduction(+:norm) private(i, j, tmp) shared(w, r)
         for (i = 1; i < M; i++) {
             for (j = 1; j < N; j++) {
-                double tmp = w[i][j];
+                tmp = w[i][j];
                 w[i][j] -= tau * r[i][j];
-                Diff[i][j] = w[i][j] - tmp;
-                norm += Diff[i][j] * Diff[i][j] * h1 * h2;
+                tmp = w[i][j] - tmp;
+                norm += tmp * tmp * h1 * h2;
             }
         }
 
+
+
         norm = sqrt(norm);
-
-        if(!(iter % step) && err_cnt < 19){
-            err_by_iter[err_cnt++] = norm;
-        }
-
-        // if(!(iter % step_2)) {
-        //     for (i = 0; i < M; i++) {
-        //         for (j = 0; j < N; j++) {
-        //             printf("%f ", r[i][j]);
-        //         }
-        //         printf("\n");
-        //     }
-        //     printf("==========================================================================================================\n");
-        // }
-
-        printf("Тау: %lf, norm_r: %lf, norm_dr%lf, norm: %lf\n", tau, norm_r, norm_dr, norm);
+        // printf("Tau: %f, norm_r: %f, norm_dr: %f, norm: %f\n", tau, norm_r, norm_dr, norm);
         iter++;
+
     } while (norm > ACC);
 
-    printf("Число итераций: %d\n", iter);
-
-    double end = omp_get_wtime();
-    printf("Затраченное время: %f\n", end - start);
+    return iter;
+}
 
 
-    // for (i = 0; i < 20; i++){
-    //     printf("%f, ", err_by_iter[i]);
-    // }
+void make_experiment(int num_treads) {
 
+    omp_set_num_threads(num_treads);
+    // printf("Число потоков: %d", omp_get_num_threads());
 
-    // // Вывод решения
+    double start;
+    double end;
+    double h1 = (B1 - A1) / M;
+    double h2 = (B2 - A2) / N;
+    double EPS = h1 > h2 ? h1*h1 : h2*h2;
+
+    start = omp_get_wtime();
+
+    initialize();
+    calc_coefs(h1, h2, EPS);
+
+    int iterations = MRD(h1, h2);
+
+    end = omp_get_wtime();
+    printf("Time spent: %f\n", end - start);
+
+    printf("Iterations number: %d\n", iterations);
+
+    // Вывод решения
+    // int i, j;
     // for (i = 0; i < M; i++) {
     //     for (j = 0; j < N; j++) {
-    //         printf("%f ", w[i][j]);
+    //         printf("%f ", r[i][j]);
     //     }
     //     printf("\n");
     // }
+}
+
+int main(int argc, char *argv[]){
+
+    if(argc > 1){
+        int i;
+        for(i = 1; i < argc; i++){
+            int num_threads = atoi(argv[i]);
+            printf("Проводим эксперимент с %d нитями\n", num_threads);
+            make_experiment(num_threads);
+        }
+    }
 
     return 0;
 }
