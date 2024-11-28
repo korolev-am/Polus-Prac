@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <omp.h>
 #include <math.h>
+#include <stdlib.h>
 
 // это задаем область П - прямоугольник, содержащий нашу трапецию
 #define A1 -3.0
@@ -8,8 +9,8 @@
 #define B1 3.0
 #define B2 3.0
 
-#define M 10
-#define N 10
+#define M 41
+#define N 41
 
 #define ACC 1e-6 // это точность метода
 
@@ -123,7 +124,7 @@ double lengh_of_vert_line(Point top, Point bottom){
         top_point.y = 3.0 * bottom.x + 9.0;
         top_point.x = top.x;
         bottom_point = bottom;
-    } else if (right_line(bottom) > 0 && left_line(top) < 0){
+    } else if (right_line(bottom) > 0 && right_line(top) < 0){
         top_point.y = -3.0 * bottom.x + 9.0;
         top_point.x = top.x;
         bottom_point = bottom;
@@ -146,7 +147,7 @@ double lengh_of_horz_line(Point left, Point right){
     } else if (left_line(right) > 0 && left_line(left) < 0){
         left_point = calc_left_point(right);
         right_point = right;
-    } else if (right_line(left) > 0 && left_line(right) < 0){
+    } else if (right_line(left) > 0 && right_line(right) < 0){
         left_point = left;
         right_point = calc_right_point(left);
     }
@@ -228,10 +229,12 @@ int MRD(double h1, double h2){
     double tau, norm_r, norm_dr, norm, tmp;
     int i, j;
     int iter = 0;
+    double max_value;
     do {
         norm_r = 0.0;
         norm_dr = 0.0;
         norm = 0.0;
+        max_value = -1.0;
 
         #pragma omp parallel for collapse(2) reduction(+:norm_r) private(i, j) shared(a, b, F, r, w)
         for (i = 1; i < M-1; i++) {
@@ -240,6 +243,11 @@ int MRD(double h1, double h2){
                 r[i][j] = -(a[i+1][j] * (w[i+1][j] - w[i][j]) / h1 - a[i][j] * (w[i][j] - w[i-1][j]) / h1) / h1
                         - (b[i][j+1] * (w[i][j+1] - w[i][j]) / h2 - b[i][j] * (w[i][j] - w[i][j-1]) / h2) / h2
                         - F[i][j];
+
+                if(abs(r[i][j]) > max_value){
+                    max_value = abs(r[i][j]);
+                }
+                
                 norm_r += r[i][j] * r[i][j] * h1 * h2;
             }
         }
@@ -268,11 +276,11 @@ int MRD(double h1, double h2){
 
 
 
-        norm = sqrt(norm);
+        // norm = sqrt(norm);
         // printf("Tau: %f, norm_r: %f, norm_dr: %f, norm: %f\n", tau, norm_r, norm_dr, norm);
         iter++;
 
-    } while (norm > ACC);
+    } while (max_value > ACC);
 
     return iter;
 }
@@ -305,7 +313,7 @@ void make_experiment(int num_treads) {
     // int i, j;
     // for (i = 0; i < M; i++) {
     //     for (j = 0; j < N; j++) {
-    //         printf("%f ", r[i][j]);
+    //         printf("%f ", w[i][j]);
     //     }
     //     printf("\n");
     // }
