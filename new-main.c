@@ -244,8 +244,8 @@ int MRD(double h1, double h2){
                         - (b[i][j+1] * (w[i][j+1] - w[i][j]) / h2 - b[i][j] * (w[i][j] - w[i][j-1]) / h2) / h2
                         - F[i][j];
 
-                if(abs(r[i][j]) > max_value){
-                    max_value = abs(r[i][j]);
+                if(fabs(r[i][j]) > max_value){
+                    max_value = fabs(r[i][j]);
                 }
                 
                 norm_r += r[i][j] * r[i][j] * h1 * h2;

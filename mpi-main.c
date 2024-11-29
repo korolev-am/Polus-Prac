@@ -315,8 +315,8 @@ int MRD(double h1, double h2, double **a, double **b, double **F, double **w, do
                 // printf("%f ", r[i][j]);
                 norm_r += r[i][j] * r[i][j] * h1 * h2;
 
-                if(abs(r[i][j]) > max_value){
-                    max_value = abs(r[i][j]);
+                if(fabs(r[i][j]) > max_value){
+                    max_value = fabs(r[i][j]);
                 }
 
 
