@@ -178,8 +178,6 @@ double f(double x_l, double y_l, double x_r, double y_r, double h1, double h2) {
 
 double w[M][N];
 double r[M][N];
-// double a[M][N], b[M][N];
-// double F[M][N];
 double Ar[M][N];
 
 
@@ -194,7 +192,6 @@ void initialize(double **a, double **b, double **F, double **w, double **r, doub
     int i = 0;
     int j = 0;
 
-    // #pragma omp parallel for collapse(2) private(i, j)
     for (i = 0; i < M; i++) {
         for (j = 0; j < N; j++) {
             w[i][j] = 0.0;
@@ -396,7 +393,7 @@ int MRD(double h1, double h2, double **a, double **b, double **F, double **w, do
 
         tau = global_norm_r / global_norm_dr;
 
-        #pragma omp parallel for private(i, j, tmp) shared(w, r)
+        #pragma omp parallel for collapse(2) private(i, j, tmp) shared(w, r)
         for (i = row_start + 1; i < row_end; i++) {
             for (j = col_start + 1; j < col_end; j++) {
 
