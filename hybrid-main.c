@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <omp.h>
 #include <math.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -9,6 +10,7 @@
 #define A2 -0.5
 #define B1 3.5
 #define B2 3.5
+
 
 #define M 41
 #define N 41
@@ -325,6 +327,7 @@ int MRD(double h1, double h2, double **a, double **b, double **F, double **w, do
             MPI_Irecv(receiving_row_data[col_n_id], col_end - col_start - 1, MPI_DOUBLE, col_neighbour_ranks[col_n_id], msg_iter, MPI_COMM_WORLD, &(r_row[col_n_id]));
         }
 
+        #pragma omp parallel for collapse(2) reduction(+:norm_r) reduction(max:max_value) private(i, j) shared(a, b, F, r, w)
         for (i = row_start + 1; i < row_end; i++) {
             for (j = col_start + 1; j < col_end; j++) {
 
@@ -377,6 +380,7 @@ int MRD(double h1, double h2, double **a, double **b, double **F, double **w, do
 
         msg_iter++;
 
+        #pragma omp parallel for collapse(2) reduction(+:norm_dr) private(i, j) shared(a, b, r, Ar)
         for (i = row_start + 1; i < row_end; i++) {
             for (j = col_start + 1; j < col_end; j++) {
 
@@ -392,6 +396,7 @@ int MRD(double h1, double h2, double **a, double **b, double **F, double **w, do
 
         tau = global_norm_r / global_norm_dr;
 
+        #pragma omp parallel for private(i, j, tmp) shared(w, r)
         for (i = row_start + 1; i < row_end; i++) {
             for (j = col_start + 1; j < col_end; j++) {
 

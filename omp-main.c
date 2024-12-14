@@ -1,18 +1,19 @@
 #include <stdio.h>
 #include <omp.h>
 #include <math.h>
+#include <limits.h>
 #include <stdlib.h>
 
 // это задаем область П - прямоугольник, содержащий нашу трапецию
-#define A1 -3.0
-#define A2 0.0
-#define B1 3.0
-#define B2 3.0
+#define A1 -3.5
+#define A2 -0.5
+#define B1 3.5
+#define B2 3.5
 
 #define M 41
 #define N 41
 
-#define ACC 1e-6 // это точность метода
+#define ACC 1e-5 // это точность метода
 
 
 typedef struct {
@@ -186,7 +187,7 @@ void initialize(){
     int i = 0;
     int j = 0;
 
-    #pragma omp parallel for collapse(2) private(i, j)
+    // #pragma omp parallel for collapse(2) private(i, j)
     for (i = 0; i < M; i++) {
         for (j = 0; j < N; j++) {
             w[i][j] = 0.0;
@@ -204,7 +205,7 @@ void calc_coefs(double h1, double h2, double EPS){
     double xi, yj, lij, gij, tmp;
     int i, j;
     // Вычисление коэффициентов a, b и правой части F
-    #pragma omp parallel for collapse(2) private(i, j, xi, yj, lij, gij)
+    // #pragma omp parallel for collapse(2) private(i, j, xi, yj, lij, gij)
     for (i = 1; i < M; i++) {
         for (j = 1; j < N; j++) {
             xi = A1 + i*h1;
@@ -229,14 +230,19 @@ int MRD(double h1, double h2){
     double tau, norm_r, norm_dr, norm, tmp;
     int i, j;
     int iter = 0;
-    double max_value;
-    do {
+    double max_value = 1.0;
+    for(iter = 0; iter < INT_MAX; iter++) {
+
+        if (iter % 1000 == 0 && max_value <= ACC) {
+            break;
+        }
+
         norm_r = 0.0;
         norm_dr = 0.0;
         norm = 0.0;
         max_value = -1.0;
 
-        #pragma omp parallel for collapse(2) reduction(+:norm_r) private(i, j) shared(a, b, F, r, w)
+        #pragma omp parallel for collapse(2) reduction(+:norm_r) reduction(max:max_value) private(i, j) shared(a, b, F, r, w)
         for (i = 1; i < M-1; i++) {
             for (j = 1; j < N-1; j++) {
                 // тут вычисляем невязку
@@ -264,23 +270,15 @@ int MRD(double h1, double h2){
 
         tau = norm_r / norm_dr;
 
-        #pragma omp parallel for reduction(+:norm) private(i, j, tmp) shared(w, r)
+        #pragma omp parallel for collapse(2) private(i, j, tmp) shared(w, r)
         for (i = 1; i < M; i++) {
             for (j = 1; j < N; j++) {
                 tmp = w[i][j];
                 w[i][j] -= tau * r[i][j];
                 tmp = w[i][j] - tmp;
-                norm += tmp * tmp * h1 * h2;
             }
         }
-
-
-
-        // norm = sqrt(norm);
-        // printf("Tau: %f, norm_r: %f, norm_dr: %f, norm: %f\n", tau, norm_r, norm_dr, norm);
-        iter++;
-
-    } while (max_value > ACC);
+    }
 
     return iter;
 }
